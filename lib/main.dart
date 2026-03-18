@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'core/app_navigator.dart';
 import 'core/app_theme.dart';
 import 'pages/login_page.dart';
 
@@ -14,6 +15,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Game Results',
       debugShowCheckedModeBanner: false,
+      navigatorKey: AppNavigator.navigatorKey,
       theme: AppTheme.lightTheme,
       home: const LoginPage(),
     );

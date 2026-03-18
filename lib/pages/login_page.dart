@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../services/mock_auth_service.dart';
+import '../services/auth_api_service.dart';
+import '../services/auth_session_service.dart';
 import '../widgets/app_logo.dart';
 import 'home_page.dart';
 import 'register_page.dart';
@@ -14,37 +15,62 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
 
-  final _emailController = TextEditingController();
+  final _usernameOrEmailController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  final _authService = MockAuthService.instance;
+  final _authService = AuthApiService.instance;
+  final _sessionService = AuthSessionService.instance;
+  bool _isSubmitting = false;
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _usernameOrEmailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  void _login() {
+  Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final user = _authService.login(
-      email: _emailController.text.trim(),
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    final result = await _authService.login(
+      usernameOrEmail: _usernameOrEmailController.text.trim(),
       password: _passwordController.text.trim(),
     );
 
-    if (user == null) {
+    if (!mounted) return;
+
+    setState(() {
+      _isSubmitting = false;
+    });
+
+    if (!result.isSuccess) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Credenziali non valide')),
+        SnackBar(content: Text(result.message)),
       );
       return;
     }
 
+    final currentName = _sessionService.givenName?.trim();
+    final currentUsername = _sessionService.username?.trim();
+    final fallbackUsername = _usernameOrEmailController.text.trim();
+    final welcomeName =
+      (currentName != null && currentName.isNotEmpty)
+        ? currentName
+        : (currentUsername != null && currentUsername.isNotEmpty)
+          ? currentUsername
+          : fallbackUsername;
+
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (_) => HomePage(currentUsername: user.username),
+        builder: (_) => HomePage(
+          currentUsername: welcomeName,
+        ),
       ),
     );
   }
@@ -75,17 +101,14 @@ class _LoginPageState extends State<LoginPage> {
                         child: Column(
                           children: [
                             TextFormField(
-                              controller: _emailController,
+                              controller: _usernameOrEmailController,
                               decoration: const InputDecoration(
-                                labelText: 'Email',
+                                labelText: 'Username o Email',
                                 prefixIcon: Icon(Icons.email_outlined),
                               ),
                               validator: (value) {
                                 if (value == null || value.trim().isEmpty) {
-                                  return 'Inserisci email';
-                                }
-                                if (!value.contains('@')) {
-                                  return 'Email non valida';
+                                  return 'Inserisci username o email';
                                 }
                                 return null;
                               },
@@ -93,10 +116,22 @@ class _LoginPageState extends State<LoginPage> {
                             const SizedBox(height: 16),
                             TextFormField(
                               controller: _passwordController,
-                              obscureText: true,
-                              decoration: const InputDecoration(
+                              obscureText: _obscurePassword,
+                              decoration: InputDecoration(
                                 labelText: 'Password',
-                                prefixIcon: Icon(Icons.lock_outline),
+                                prefixIcon: const Icon(Icons.lock_outline),
+                                suffixIcon: IconButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _obscurePassword = !_obscurePassword;
+                                    });
+                                  },
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
+                                  ),
+                                ),
                               ),
                               validator: (value) {
                                 if (value == null || value.trim().isEmpty) {
@@ -110,8 +145,14 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                             const SizedBox(height: 20),
                             FilledButton(
-                              onPressed: _login,
-                              child: const Text('Accedi'),
+                              onPressed: _isSubmitting ? null : _login,
+                              child: _isSubmitting
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    )
+                                  : const Text('Accedi'),
                             ),
                             const SizedBox(height: 12),
                             OutlinedButton(
@@ -127,13 +168,6 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                           ],
                         ),
-                      ),
-                      const SizedBox(height: 20),
-                      const Text(
-                        'Utenti demo:\n'
-                        'mario@test.com / 1234\n'
-                        'luigi@test.com / 1234',
-                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),

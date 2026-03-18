@@ -6,9 +6,30 @@ class MockAuthService {
   static final MockAuthService instance = MockAuthService._();
 
   final List<AppUser> _users = [
-    AppUser(id: 1, username: 'mario', email: 'mario@test.com', password: '1234'),
-    AppUser(id: 2, username: 'luigi', email: 'luigi@test.com', password: '1234'),
-    AppUser(id: 3, username: 'anna', email: 'anna@test.com', password: '1234'),
+    AppUser(
+      id: 1,
+      firstName: 'Mario',
+      lastName: 'Rossi',
+      username: 'mario',
+      email: 'mario@test.com',
+      password: '1234',
+    ),
+    AppUser(
+      id: 2,
+      firstName: 'Luigi',
+      lastName: 'Verdi',
+      username: 'luigi',
+      email: 'luigi@test.com',
+      password: '1234',
+    ),
+    AppUser(
+      id: 3,
+      firstName: 'Anna',
+      lastName: 'Bianchi',
+      username: 'anna',
+      email: 'anna@test.com',
+      password: '1234',
+    ),
   ];
 
   AppUser? login({
@@ -27,6 +48,8 @@ class MockAuthService {
   }
 
   bool register({
+    required String firstName,
+    required String lastName,
     required String username,
     required String email,
     required String password,
@@ -42,6 +65,8 @@ class MockAuthService {
     _users.add(
       AppUser(
         id: _users.length + 1,
+        firstName: firstName,
+        lastName: lastName,
         username: username,
         email: email,
         password: password,

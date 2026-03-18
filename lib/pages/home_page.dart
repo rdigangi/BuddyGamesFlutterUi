@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../services/auth_api_service.dart';
+import '../services/auth_session_service.dart';
 import '../widgets/app_logo.dart';
 import 'add_result_page.dart';
 import 'login_page.dart';
@@ -14,12 +16,80 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final sessionUsername = AuthSessionService.instance.username?.trim();
+    final roles = AuthSessionService.instance.roles;
+    final isAdmin = roles.any(
+      (role) =>
+          role.trim().toLowerCase() == 'admin' ||
+          role.trim().toLowerCase() == 'administrator' ||
+          role.trim().toLowerCase() == 'amministratore',
+    );
+    final usernameToShow =
+        (sessionUsername != null && sessionUsername.isNotEmpty)
+            ? sessionUsername
+            : currentUsername;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Home'),
         actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Row(
+              children: [
+                const CircleAvatar(
+                  radius: 14,
+                  child: Icon(Icons.person_outline, size: 16),
+                ),
+                const SizedBox(width: 8),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 120),
+                  child: Text(
+                    usernameToShow,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+                if (isAdmin) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.verified_user_outlined,
+                          size: 14,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onPrimaryContainer,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Admin',
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onPrimaryContainer,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
           IconButton(
             onPressed: () {
+              AuthApiService.instance.logout();
               Navigator.pushAndRemoveUntil(
                 context,
                 MaterialPageRoute(builder: (_) => const LoginPage()),
