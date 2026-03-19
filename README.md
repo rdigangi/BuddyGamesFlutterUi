@@ -20,9 +20,18 @@ Applicazione Flutter per la gestione dei risultati partite, con autenticazione b
 - Refresh automatico token su `401` (`POST /api/authentication/refresh`) e retry della chiamata protetta
 - Logout forzato con redirect a login se refresh fallisce/scade
 - Home con navigazione alle sezioni principali
-- Header home con avatar profilo placeholder + username
+- Header home con avatar profilo dinamico da `/me` (fallback placeholder) + username
 - Badge ruolo admin in home se presente nei claim JWT (`role = Amministratore`)
 - Messaggio di benvenuto con nome utente dai claim JWT (`nome` / `given_name` / `ClaimTypes.GivenName`)
+- Pagina "Informazioni utente" con sezioni a fisarmonica (una aperta per volta):
+	- `Informazioni di base` da `GET /me` (`nome`, `cognome`, `email`)
+	- `Preferenze` (mock placeholder)
+	- `Statistiche` (placeholder)
+- Upload immagine profilo da dispositivo (tap su avatar in pagina profilo)
+	- validazione client formati: jpeg/png/webp/gif
+	- validazione client dimensione massima: 5MB
+	- upload multipart su `POST /me/profile-image` (campo form `file`)
+	- refresh UI immediato dell'avatar in pagina profilo e in home
 - Inserimento nuovo risultato partita
 - Lista risultati salvati in memoria (mock service)
 - Tema personalizzato con Material
@@ -33,6 +42,8 @@ Applicazione Flutter per la gestione dei risultati partite, con autenticazione b
 - Flutter
 - Dart SDK `^3.11.1`
 - `http` per integrazione REST API
+- `file_picker` per selezione immagine dal dispositivo
+- `http_parser` per `MediaType` nelle richieste multipart
 - `flutter_launcher_icons` per generazione icone app
 
 ## Struttura principale
@@ -41,9 +52,9 @@ Applicazione Flutter per la gestione dei risultati partite, con autenticazione b
 - `lib/pages/`: schermate (`login`, `register`, `home`, `add_result`, `results_list`)
 - `lib/models/`: modelli dominio (`app_user`, `match_result`)
 - `lib/services/`:
-	- `auth_api_service.dart`: chiamate login/register/refresh
+	- `auth_api_service.dart`: chiamate login/register/refresh/me + upload immagine profilo
 	- `auth_session_service.dart`: stato sessione e claim JWT
-	- `authenticated_api_client.dart`: chiamate protette con header Bearer + retry post-refresh
+	- `authenticated_api_client.dart`: chiamate protette JSON e multipart con header Bearer + retry post-refresh
 	- `mock_results_service.dart`: risultati demo in memoria
 - `lib/core/`:
 	- `app_config.dart`: base URL configurabile + endpoint auth
@@ -75,6 +86,9 @@ Endpoint auth attesi:
 - `POST /api/Authentication/register`
 - `POST /api/authentication/login`
 - `POST /api/authentication/refresh`
+- `GET /me`
+- `POST /me/profile-image` (multipart/form-data, campo `file`)
+- `DELETE /me/profile-image` (endpoint backend supportato; integrazione UI opzionale)
 
 > Nota: su emulatori/simulatori, `localhost` può richiedere un host alternativo in base alla piattaforma.
 
@@ -85,6 +99,16 @@ Endpoint auth attesi:
 3. Se risposta `401`: tentativo refresh token.
 4. Se refresh OK: retry automatico chiamata originale.
 5. Se refresh fallisce: pulizia sessione, logout e redirect login.
+
+Per upload immagine profilo:
+
+1. Selezione file da dispositivo.
+2. Validazione client di formato e size.
+3. Invio multipart autenticato a `POST /me/profile-image`.
+4. In caso `401`, refresh token e retry automatico.
+5. Aggiornamento avatar UI da `profileImageUrl` ritornato dalla API.
+
+> Se la API risponde con errore storage (es. Cloudflare R2), verificare credenziali/permessi bucket lato backend.
 
 ### JWT Claims usati dalla UI
 

@@ -20,4 +20,9 @@ class AppConfig {
 
   static Uri get refreshUri =>
       Uri.parse('$_normalizedBaseUrl/api/authentication/refresh');
+
+  static Uri get meUri => Uri.parse('$_normalizedBaseUrl/me');
+
+  static Uri get meProfileImageUri =>
+      Uri.parse('$_normalizedBaseUrl/me/profile-image');
 }

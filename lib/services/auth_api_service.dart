@@ -1,37 +1,64 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 import '../core/app_config.dart';
+import 'authenticated_api_client.dart';
 import 'auth_session_service.dart';
 
 class RegisterResult {
   final bool isSuccess;
   final String message;
 
-  const RegisterResult({
-    required this.isSuccess,
-    required this.message,
-  });
+  const RegisterResult({required this.isSuccess, required this.message});
 }
 
 class LoginResult {
   final bool isSuccess;
   final String message;
 
-  const LoginResult({
-    required this.isSuccess,
-    required this.message,
-  });
+  const LoginResult({required this.isSuccess, required this.message});
 }
 
 class RefreshResult {
   final bool isSuccess;
   final String message;
 
-  const RefreshResult({
+  const RefreshResult({required this.isSuccess, required this.message});
+}
+
+class MeInfo {
+  final String nome;
+  final String cognome;
+  final String email;
+  final String? profileImageUrl;
+
+  const MeInfo({
+    required this.nome,
+    required this.cognome,
+    required this.email,
+    this.profileImageUrl,
+  });
+}
+
+class MeResult {
+  final bool isSuccess;
+  final String message;
+  final MeInfo? data;
+
+  const MeResult({required this.isSuccess, required this.message, this.data});
+}
+
+class ProfileImageUpdateResult {
+  final bool isSuccess;
+  final String message;
+  final String? profileImageUrl;
+
+  const ProfileImageUpdateResult({
     required this.isSuccess,
     required this.message,
+    this.profileImageUrl,
   });
 }
 
@@ -76,13 +103,16 @@ class AuthApiService {
       if (response.statusCode == 400) {
         return RegisterResult(
           isSuccess: false,
-          message: _extractMessage(response.body) ?? 'Dati di registrazione non validi',
+          message:
+              _extractMessage(response.body) ??
+              'Dati di registrazione non validi',
         );
       }
 
       return RegisterResult(
         isSuccess: false,
-        message: _extractMessage(response.body) ??
+        message:
+            _extractMessage(response.body) ??
             'Registrazione fallita (${response.statusCode})',
       );
     } catch (_) {
@@ -134,7 +164,8 @@ class AuthApiService {
             refreshTokenExpiresAtUtc is! String) {
           return LoginResult(
             isSuccess: false,
-            message: _extractMessage(response.body) ?? 'Dati di login incompleti',
+            message:
+                _extractMessage(response.body) ?? 'Dati di login incompleti',
           );
         }
 
@@ -156,14 +187,16 @@ class AuthApiService {
 
         return LoginResult(
           isSuccess: true,
-          message: _extractMessage(response.body) ?? 'Login effettuato con successo',
+          message:
+              _extractMessage(response.body) ?? 'Login effettuato con successo',
         );
       }
 
       if (response.statusCode == 400 || response.statusCode == 401) {
         return LoginResult(
           isSuccess: false,
-          message: _extractMessage(response.body) ??
+          message:
+              _extractMessage(response.body) ??
               (response.statusCode == 401
                   ? 'Credenziali non valide'
                   : 'Richiesta non valida'),
@@ -172,7 +205,9 @@ class AuthApiService {
 
       return LoginResult(
         isSuccess: false,
-        message: _extractMessage(response.body) ?? 'Login fallito (${response.statusCode})',
+        message:
+            _extractMessage(response.body) ??
+            'Login fallito (${response.statusCode})',
       );
     } catch (_) {
       return const LoginResult(
@@ -206,9 +241,7 @@ class AuthApiService {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
             },
-            body: jsonEncode({
-              'refreshToken': refreshToken,
-            }),
+            body: jsonEncode({'refreshToken': refreshToken}),
           )
           .timeout(const Duration(seconds: 15));
 
@@ -261,7 +294,8 @@ class AuthApiService {
       if (response.statusCode == 400 || response.statusCode == 401) {
         return RefreshResult(
           isSuccess: false,
-          message: _extractMessage(response.body) ??
+          message:
+              _extractMessage(response.body) ??
               (response.statusCode == 401
                   ? 'Refresh token non valido o scaduto'
                   : 'Richiesta refresh non valida'),
@@ -271,10 +305,135 @@ class AuthApiService {
       return RefreshResult(
         isSuccess: false,
         message:
-            _extractMessage(response.body) ?? 'Refresh fallito (${response.statusCode})',
+            _extractMessage(response.body) ??
+            'Refresh fallito (${response.statusCode})',
       );
     } catch (_) {
       return const RefreshResult(
+        isSuccess: false,
+        message: 'Errore di connessione al server',
+      );
+    }
+  }
+
+  Future<MeResult> getMe() async {
+    try {
+      final response = await AuthenticatedApiClient.instance.send(
+        (headers) => http
+            .get(AppConfig.meUri, headers: headers)
+            .timeout(const Duration(seconds: 15)),
+      );
+
+      if (response.statusCode == 200) {
+        final body = _decodeMap(response.body);
+        if (body == null) {
+          return const MeResult(
+            isSuccess: false,
+            message: 'Risposta /me non valida',
+          );
+        }
+
+        final source = _extractProfileMap(body);
+        final nome = _readString(source, const [
+          'nome',
+          'firstName',
+          'givenName',
+        ]);
+        final cognome = _readString(source, const [
+          'cognome',
+          'lastName',
+          'familyName',
+        ]);
+        final email = _readString(source, const ['email', 'mail']);
+        final profileImageUrl = _readNullableString(source, const [
+          'profileImageUrl',
+          'avatarUrl',
+        ]);
+
+        if (nome == null || cognome == null || email == null) {
+          return const MeResult(
+            isSuccess: false,
+            message: 'Dati utente incompleti dalla /me',
+          );
+        }
+
+        return MeResult(
+          isSuccess: true,
+          message: 'Dati utente recuperati',
+          data: MeInfo(
+            nome: nome,
+            cognome: cognome,
+            email: email,
+            profileImageUrl: profileImageUrl,
+          ),
+        );
+      }
+
+      return MeResult(
+        isSuccess: false,
+        message:
+            _extractMessage(response.body) ??
+            'Recupero dati utente fallito (${response.statusCode})',
+      );
+    } catch (_) {
+      return const MeResult(
+        isSuccess: false,
+        message: 'Errore di connessione al server',
+      );
+    }
+  }
+
+  Future<ProfileImageUpdateResult> uploadProfileImage({
+    required List<int> bytes,
+    required String fileName,
+    required String mimeType,
+  }) async {
+    try {
+      final response = await AuthenticatedApiClient.instance.sendMultipart((
+        headers,
+      ) {
+        final request = http.MultipartRequest(
+          'POST',
+          AppConfig.meProfileImageUri,
+        );
+        request.headers.addAll(headers);
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'file',
+            bytes,
+            filename: fileName,
+            contentType: MediaType.parse(mimeType),
+          ),
+        );
+
+        return request.send().timeout(const Duration(seconds: 30));
+      });
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final body = _decodeMap(response.body);
+        final source = body == null ? null : _extractProfileMap(body);
+        final profileImageUrl = source == null
+            ? null
+            : _readNullableString(source, const [
+                'profileImageUrl',
+                'avatarUrl',
+              ]);
+
+        return ProfileImageUpdateResult(
+          isSuccess: true,
+          message: 'Immagine profilo aggiornata',
+          profileImageUrl: profileImageUrl,
+        );
+      }
+
+      return ProfileImageUpdateResult(
+        isSuccess: false,
+        message:
+            _extractMessage(response.body) ??
+            'Upload immagine fallito (${response.statusCode})',
+      );
+    } catch (_) {
+      return const ProfileImageUpdateResult(
         isSuccess: false,
         message: 'Errore di connessione al server',
       );
@@ -322,7 +481,8 @@ class AuthApiService {
           }
         }
 
-        final message = decoded['message'] ?? decoded['error'] ?? decoded['title'];
+        final message =
+            decoded['message'] ?? decoded['error'] ?? decoded['title'];
         if (message is String && message.trim().isNotEmpty) {
           return message;
         }
@@ -333,6 +493,44 @@ class AuthApiService {
     } catch (_) {
       if (body.trim().isNotEmpty) {
         return body;
+      }
+    }
+
+    return null;
+  }
+
+  Map<String, dynamic> _extractProfileMap(Map<String, dynamic> body) {
+    final userNode = body['user'];
+    if (userNode is Map<String, dynamic>) {
+      return userNode;
+    }
+
+    final dataNode = body['data'];
+    if (dataNode is Map<String, dynamic>) {
+      return dataNode;
+    }
+
+    return body;
+  }
+
+  String? _readString(Map<String, dynamic> source, List<String> keys) {
+    for (final key in keys) {
+      final value = source[key];
+      if (value is String && value.trim().isNotEmpty) {
+        return value.trim();
+      }
+    }
+
+    return null;
+  }
+
+  String? _readNullableString(Map<String, dynamic> source, List<String> keys) {
+    for (final key in keys) {
+      final value = source[key];
+      if (value == null) continue;
+      if (value is String) {
+        final trimmed = value.trim();
+        return trimmed.isEmpty ? null : trimmed;
       }
     }
 

@@ -5,14 +5,29 @@ import '../widgets/app_logo.dart';
 import 'add_result_page.dart';
 import 'login_page.dart';
 import 'results_list_page.dart';
+import 'user_info_page.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   final String currentUsername;
 
-  const HomePage({
-    super.key,
-    required this.currentUsername,
-  });
+  const HomePage({super.key, required this.currentUsername});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  late Future<MeResult> _meFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _reloadMe();
+  }
+
+  void _reloadMe() {
+    _meFuture = AuthApiService.instance.getMe();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,8 +41,8 @@ class HomePage extends StatelessWidget {
     );
     final usernameToShow =
         (sessionUsername != null && sessionUsername.isNotEmpty)
-            ? sessionUsername
-            : currentUsername;
+        ? sessionUsername
+        : widget.currentUsername;
 
     return Scaffold(
       appBar: AppBar(
@@ -35,56 +50,86 @@ class HomePage extends StatelessWidget {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: Row(
-              children: [
-                const CircleAvatar(
-                  radius: 14,
-                  child: Icon(Icons.person_outline, size: 16),
-                ),
-                const SizedBox(width: 8),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 120),
-                  child: Text(
-                    usernameToShow,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ),
-                if (isAdmin) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(999),
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const UserInfoPage()),
+                );
+                if (!mounted) return;
+                setState(() {
+                  _reloadMe();
+                });
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Row(
+                  children: [
+                    FutureBuilder<MeResult>(
+                      future: _meFuture,
+                      builder: (context, snapshot) {
+                        final avatarUrl = snapshot.data?.data?.profileImageUrl;
+
+                        return CircleAvatar(
+                          radius: 14,
+                          backgroundImage:
+                              (avatarUrl != null && avatarUrl.isNotEmpty)
+                              ? NetworkImage(avatarUrl)
+                              : null,
+                          child: (avatarUrl == null || avatarUrl.isEmpty)
+                              ? const Icon(Icons.person_outline, size: 16)
+                              : null,
+                        );
+                      },
                     ),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(999),
+                    const SizedBox(width: 8),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 120),
+                      child: Text(
+                        usernameToShow,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.verified_user_outlined,
-                          size: 14,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onPrimaryContainer,
+                    if (isAdmin) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Admin',
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onPrimaryContainer,
-                              ),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(999),
                         ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.verified_user_outlined,
+                              size: 14,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onPrimaryContainer,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Admin',
+                              style: Theme.of(context).textTheme.labelSmall
+                                  ?.copyWith(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onPrimaryContainer,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
           ),
           IconButton(
@@ -109,10 +154,10 @@ class HomePage extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const AppLogo(width: 300, height: 300, showTitle: false,),
+                  const AppLogo(width: 300, height: 300, showTitle: false),
                   const SizedBox(height: 24),
                   Text(
-                    'Benvenuto, $currentUsername',
+                    'Benvenuto, ${widget.currentUsername}',
                     style: Theme.of(context).textTheme.headlineSmall,
                     textAlign: TextAlign.center,
                   ),
